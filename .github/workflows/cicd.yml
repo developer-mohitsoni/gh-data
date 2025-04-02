@@ -1,0 +1,108 @@
+name: Node.js CI/CD Pipeline
+
+on:
+  push:
+    branches: ["main"] # Trigger on pushes to the main branch
+
+jobs:
+  lint_and_test:
+    name: Lint and Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20" # Use the same Node version as in Dockerfile
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run linter
+        run: npm run lint
+
+      - name: Run tests
+        run: npm run test
+
+  build_and_push:
+    name: Build and Push Docker Image
+    runs-on: ubuntu-latest
+    needs: lint_and_test # Run only if lint_and_test succeeds
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }} # Use secret for username
+          password: ${{ secrets.DOCKERHUB_TOKEN }} # Use secret for token
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/gh-data:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/gh-data:${{ github.sha }} # Tag with commit SHA
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy_to_aws:
+    name: Deploy to AWS
+    runs-on: ubuntu-latest
+    needs: build_and_push # Run only if build_and_push succeeds
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1 # TODO: Replace with your target AWS region
+
+      - name: Add EC2 to known hosts
+        run: ssh-keyscan -H YOUR_EC2_DNS_OR_IP >> ~/.ssh/known_hosts
+
+      # --- Deploy to AWS EC2 via SSH ---
+      # 1. Add your EC2 instance's private SSH key as a secret named EC2_SSH_KEY in GitHub repo settings.
+      # 2. Replace YOUR_EC2_DNS_OR_IP and YOUR_EC2_USER (e.g., ec2-user, ubuntu) below.
+      - name: Set up SSH Key
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.EC2_SSH_KEY }}
+
+      - name: Deploy to EC2
+        run: |
+          # Connect to EC2 and execute deployment commands
+          ssh -o StrictHostKeyChecking=no YOUR_EC2_USER@YOUR_EC2_DNS_OR_IP << 'EOF'
+            # Login to Docker Hub (optional, needed if credentials aren't cached on EC2)
+            echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
+
+            # Pull the latest image
+            docker pull ${{ secrets.DOCKERHUB_USERNAME }}/gh-data:${{ github.sha }}
+
+            # Stop the current container if it exists
+            docker stop mohitsoni02/gh-data || true
+
+            # Remove the stopped container if it exists
+            docker rm mohitsoni02/gh-data || true
+
+            # Run the new container
+            docker run -d --name github-action-cicd -p 80:80 ${{ secrets.DOCKERHUB_USERNAME }}/gh-data:${{ github.sha }}
+
+            # Optional: Clean up old images (uncomment if desired)
+            # docker image prune -a -f
+          EOF
