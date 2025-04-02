@@ -90,7 +90,7 @@ jobs:
       - name: Deploy to EC2
         run: |
           # Connect to EC2 and execute deployment commands
-          ssh -o StrictHostKeyChecking=no YOUR_EC2_USER@YOUR_EC2_DNS_OR_IP << 'EOF'
+          ssh -o StrictHostKeyChecking=no backendCohort@13.233.239.21 << 'EOF'
             # Login to Docker Hub (optional, needed if credentials aren't cached on EC2)
             echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
 
