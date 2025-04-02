@@ -73,6 +73,10 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ap-south-1 # TODO: Replace with your target AWS region
 
+      - name: Ensure SSH directory exists
+        run: mkdir -p ~/.ssh
+
+
       - name: Add EC2 to known hosts
         run: ssh-keyscan -H YOUR_EC2_DNS_OR_IP >> ~/.ssh/known_hosts
 
