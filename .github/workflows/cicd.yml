@@ -76,9 +76,8 @@ jobs:
       - name: Ensure SSH directory exists
         run: mkdir -p ~/.ssh
 
-
       - name: Add EC2 to known hosts
-        run: ssh-keyscan -H YOUR_EC2_DNS_OR_IP >> ~/.ssh/known_hosts
+        run: ssh-keyscan -H 13.233.239.21 >> ~/.ssh/known_hosts
 
       # --- Deploy to AWS EC2 via SSH ---
       # 1. Add your EC2 instance's private SSH key as a secret named EC2_SSH_KEY in GitHub repo settings.
