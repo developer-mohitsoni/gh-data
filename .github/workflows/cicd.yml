@@ -53,7 +53,7 @@ jobs:
           push: true
           tags: |
             ${{ secrets.DOCKERHUB_USERNAME }}/gh-data:latest
-            ${{ secrets.DOCKERHUB_USERNAME }}/gh-data:${{ github.sha }} # Tag with commit SHA
+            ${{ secrets.DOCKERHUB_USERNAME }}/gh-data:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
